@@ -36,6 +36,19 @@ module.exports.onStart = function () {
 
 
 
+    const { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSync } = require('fs');
+    const { join, dirname } = require('path');
+    const { homedir } = require('os');
+
+    const { Signature, SamsungCertificateCreator } = require('tizen')
+    const adbhost = require('adbhost');
+    const AdbPacket = require('adbhost/lib/packet.js');
+
+    const { execSync } = require('child_process'); // for wascmd, possibly also buxton2ctl if needed
+    const xml2js = require('xml2js');
+    const JSZip = require('jszip');
+
+
     function checkCanConnectToDevice() {
         fetch('http://127.0.0.1:8001/api/v2/').then(res => res.json())
             .then(json => {
@@ -45,13 +58,46 @@ module.exports.onStart = function () {
             });
     }
 
-    const { Signature, SamsungCertificateCreator } = require('tizen')
 
-    const adbhost = require('adbhost');
-    const { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSync } = require('fs');
-    const { join, dirname } = require('path');
-    const { homedir } = require('os');
+    const saveFileName = `${homedir()}/share/tizenbrewInstallerSave.json`;
+    function readConfig() {
+        if (!existsSync(saveFileName)) {
+            return {
+                authorCert: null,
+                distributorCert: null,
+                password: null
+            };
+        }
+        return JSON.parse(readFileSync(saveFileName, 'utf8'));
+    }
+
+    function writeConfig(config) {
+        if (!existsSync(`${homedir()}/share`)) {
+            mkdirSync(`${homedir()}/share`);
+        }
+
+        writeFileSync(saveFileName, JSON.stringify(config, null, 4));
+    }
 
 
-    module.exports.onStart();
+    function htmlWebPageForCertificateCredentials() {
+        // TODO
+    }
+
+
+    function fetchLatestRelease(repo) {
+        // TODO
+    }
+
+    // and a lot more code to be made...
+
+} // end of onStart()
+
+// This is called when the UI sends an AppControl signal
+module.exports.onRequest = function (request) {
+    const wgtUrl = request.data.find(d => d.key === "wgt_url").value[0];
+    // TODO
+}
+
+module.exports.onStart();
 

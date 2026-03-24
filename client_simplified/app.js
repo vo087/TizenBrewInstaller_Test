@@ -176,7 +176,7 @@ var App = (function () {
     var repo = ghInput.value.trim();
     if (!repo) return;
     installRepo(repo);
-    ghInput.value = '';
+    //ghInput.value = ''; // could clear, but in case typo it is nicer to keep it.
     
     //hideNavHint();
     //showScreen('home');
@@ -258,3 +258,34 @@ var App = (function () {
   };
 
 })();
+
+
+
+// Here is a trick instead of using a websocket inside Tizen:
+// This might not work, untested.
+function triggerServiceInstall(wgtUrl, samsungInfo) {
+  const serviceId = "vo087TizenIn.InstallerService"; // From your config.xml
+
+  // Package the data into Tizen-specific 'extra data'
+  const data = [
+    new tizen.ApplicationControlData("wgt_url", [wgtUrl]),
+    new tizen.ApplicationControlData("email", [samsungInfo.email]),
+    new tizen.ApplicationControlData("password", [samsungInfo.password])
+  ];
+
+  const appControl = new tizen.ApplicationControl(
+    "http://tizen.org/appcontrol/operation/default",
+    null, null, null, data
+  );
+
+  tizen.application.launchAppControl(
+    appControl,
+    serviceId,
+    () => console.log("Service signaled!"),
+    (err) => console.error("Failed to reach service: " + err.message)
+  );
+}
+
+// Also here is something else
+// maybe this privledge could be used instead of adb + wascmd or similar :
+// http://tizen.org/privilege/packagemanager.install
