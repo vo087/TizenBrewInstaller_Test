@@ -1,1 +1,282 @@
-/* css file to style html - target: Tizen +5.5 and later : Chromium 69 / M69 */
+/* target: Tizen 5.5+ and later / Chromium 69 - 1920×1080 */
+
+/*  Reset & base  */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --surface2:  #21262d;
+  --accent:    #4f8ef7;
+  --accent2:   #5b96f7;
+  --focus:     #58a6ff;
+  --text:      #e6edf3;
+  --text-dim:  #8b949e;
+  --error:     #f85149;
+  --border:    #30363d;
+  --radius:    20px;
+  --radius-sm: 10px;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Samsung One', 'SamsungOne', sans-serif;
+  font-size: 32px;
+  user-select: none;
+}
+
+a {
+  text-decoration: inherit;
+  color: inherit;
+  cursor: auto;
+}
+
+/*  Screens  */
+.screen {
+  display: none;
+  width: 1920px;
+  height: 910px; /*1080px;*/
+  flex-direction: column;
+  
+  /* I actually want it to just fill, but for now we just limit height*/
+  /*position: absolute;
+  top: 0; left: 0;*/
+}
+.screen.active { display: flex; }
+
+/*  Header  */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0px 72px; /*28px 72px; Instead we choose to make header button have the padding*/
+  padding-top: 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header button {
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 26px;
+  cursor: pointer;
+}
+
+.logo {
+  margin-top: 4px;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.logo span { color: var(--accent); }
+
+.nav-hint {
+  margin-left: 24px;
+  letter-spacing: 0px;
+  color: var(--text-dim);
+}
+
+.back-btn {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 30px;
+  padding: 10px 28px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/*  Status bar  */
+.status-bar {
+  margin-left: auto;
+  font-size: 30px;
+  color: var(--accent2);
+  background: rgba(79,142,247,0.12);
+  border: 1.5px solid rgba(83, 141, 242, 0.5);
+  border-radius: 24px;
+  padding: 8px 24px;
+  animation: pulse 1.85s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.66; } }
+
+/*  Home grid  */
+.home-grid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 144px;
+  padding: 0 96px;
+}
+
+.tile {
+  flex: 1;
+  max-width: 480px;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.tile-icon {
+  font-size: 80px;
+  color: var(--accent);
+  line-height: 1;
+}
+.tile-label {
+  font-size: 34px;
+  font-weight: 600;
+}
+.tile-sub {
+  font-size: 24px;
+  color: var(--text-dim);
+}
+
+/*  Input screen  */
+.input-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 0 320px;
+}
+
+.input-label {
+  font-size: 32px;
+  color: var(--text);
+  align-self: flex-start;
+}
+
+.tv-input {
+  width: 100%;
+  padding: 24px 32px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 30px;
+  outline: none;
+}
+.tv-input::placeholder { color: var(--text-dim); }
+
+.action-btn {
+  margin-top: 24px;
+  width: 100%;
+  padding: 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.action-btn:hover { background: #3a7bd5; }
+
+/*  Focus states 
+  Three input methods produce the same visible ring:
+  1. D-pad / arrow keys  -->  JS adds .focused class
+  2. Tab key             -->  browser :focus-visible
+  3. Mouse hover         -->  JS adds .focused class
+*/
+
+.focusable:focus-visible,
+.focusable.focused {
+  outline: none;
+  border-color: var(--focus) !important;
+  box-shadow: 0 0 0 4px rgba(88,166,255,0.35);
+  transform: scale(1.03);
+}
+
+/* Text input, same ring but no scale */
+.tv-input:focus,
+.tv-input.focused {
+  outline: none;
+  border-color: var(--focus) !important;
+  box-shadow: 0 0 0 4px rgba(88,166,255,0.35);
+}
+
+.action-btn:focus-visible,
+.action-btn.focused {
+  background: #6aa3ff;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(88,166,255,0.35);
+}
+
+/* Suppress default browser outline when not keyboard-navigating */
+.focusable:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*  Overlays  */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.overlay.hidden { display: none; }
+
+.overlay-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 64px 80px;
+  max-width: 960px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.overlay-box h2 { font-size: 44px; font-weight: 700; }
+.overlay-box p   { font-size: 26px; color: var(--text-dim); line-height: 1.5; }
+
+.access-url {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px 32px;
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+.overlay-hint { font-size: 22px !important; }
+
+/*  Error banner  */
+.error-banner {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(248,81,73,0.15);
+  border-top: 2px solid var(--error);
+  color: var(--error);
+  font-size: 32px;
+  padding: 20px 84px;
+  text-align: center;
+}
+.error-banner.hidden { display: none; }
+
+/*  Utility  */
+.hidden { display: none !important; }

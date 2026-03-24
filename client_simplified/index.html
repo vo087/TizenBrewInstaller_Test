@@ -1,1 +1,75 @@
+<!DOCTYPE html>
 <!-- raw simple html structure for visuals - target: Tizen +5.5 and later : Chromium 69 / M69 -->
+
+
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920">
+  <title>TizenBrewInstaller</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="header">
+    <button class="focusable" id="btn-back" data-index="0">
+      <div class="logo">⬡ TizenBrew<span>Installer</span></div>
+    </button>
+    <div id="nav-hint" class="logo nav-hint hidden"></div>
+    <div id="status-bar" class="status-bar hidden"></div>
+  </header>
+
+  <!-- SCREEN: HOME -->
+  <div id="screen-home" class="screen active">
+
+    <main class="home-grid">
+      <button class="tile focusable" id="btn-install-tb" data-index="1">
+        <span class="tile-icon">↓</span>
+        <span class="tile-label" id="tb-label">Reinstall TizenBrew</span>
+        <span class="tile-sub">Latest release from GitHub</span>
+      </button>
+
+      <button class="tile focusable" id="btn-install-gh" data-index="2">
+        <span class="tile-icon">⬡</span>
+        <span class="tile-label">Install from GitHub</span>
+        <span class="tile-sub">Enter a user/repo</span>
+      </button>
+
+    </main>
+
+    <div id="error-banner" class="error-banner hidden"></div>
+    <div id="overlay-signing" class="overlay hidden">
+      <div class="overlay-box">
+        <h2>Samsung Sign-in Required</h2>
+        <p>Your TV needs a Samsung certificate before installing apps.</p>
+        <p>On a phone or computer, open a browser and go to:</p>
+        <div class="access-url" id="access-url"></div>
+        <p class="overlay-hint">Enter your Samsung account access info on that page to continue.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: GITHUB INPUT -->
+  <div id="screen-github" class="screen">
+    <main class="input-screen">
+      <label class="input-label" for="gh-input">Enter GitHub repository</label>
+      <input id="gh-input" class="tv-input focusable" type="text" placeholder="user/repo  e.g. reisxd/TizenBrew"
+        autocomplete="off" spellcheck="false" data-index="1" />
+      <button class="action-btn focusable" id="gh-install-btn" data-index="2">Install</button>
+      <div class="tile-sub" id="extra-info"></div>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <!-- HERE should be at the bottom, 72 px high, should cause flex grid to be pushed up -->
+    
+  </footer>
+
+  <script src="ws.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>
+
