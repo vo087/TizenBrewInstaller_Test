@@ -1,103 +1,292 @@
-/**
- * The background tizenbrew-installer-service but writen in a more simplistic way.
- * The old code could be used on both PC/desktop and TV, this new code is Samsung Tizen TV only.
- * 
- * Without any special tools, without polyfills, only nessesary modules.
- * Targeting Tizen 5.5+ and later, with Chromium 69 JS javascript support.
- * 
- * What it is supposed to do:
- * 1) Fetch repo releases from github, pick the .wgt release. 
- * 2) Sign the package with local account Samsung certificate (as if the developer was the user)
- * 3) Install the package to the TV.
- * 
- * This is different from a Tizen Web App. A web app is mainly just a website,
- * while this is a Web Service and a web service has access to Tizen node.js features.
- * 
- */
+// Tizen Service - different from a web app
+// docs: https://docs.tizen.org/application/web/get-started/web-service/first-service/
+// This Installer Service is used to download .wgt and run commands to sign and install the app, simplest way possible.
 
+var http = require('http');
+var https = require('https');
+var fs = require('fs');
+var child_process = require('child_process');
+var certificate_logic = require('./certificate_logic.js');
 
-'use strict';
+// Configuration
+var SERVER_PORT = 8091;
+var SIGN_PORT = 4794; // Samsung Certificate Manager auth bridge port.
+var SAVE_PATH = '/home/owner/share/tizenbrewInstallerSavedData.json';
+var TEMP_WGT_FOLDER_PATH = '/home/owner/share/tmp/sdk_tools/';
+var TEMP_WGT_PATH = TEMP_WGT_FOLDER_PATH + 'package.wgt';
+var LOCAL_HOST = '127.0.0.1'
 
-module.exports.onStart = function () {
-    console.log('Service started');
+var HEADERS = { 'User-Agent': 'TizenBrew' }; // needed, else we get 403.
+var STATUS_OK = 200
 
-    // fetch from github.
-    // adbhost ADB host and client stuff.
-    // create/get samsung certificate (as of Tizen 7). (maybe ask user for credentials/login).
-    // resign fetched package with certificate. (AuthorSignature, DistributorSignature)
-    // make sure everything is in the right path. create a new zip with signature.xml.
-    // install the package, that is Install with vd_appinstall (wascmd wrapper for SDB)  (perhaps there is a simpler way, consider it).
-    // make sure eveything is pushed and magic stuff like: ``` const sendBuffer = new Buffer(8); \n sendBuffer.writeUInt32LE(0x444E4553, 0); \n sendBuffer.writeUInt32LE(filePath.length + 6, 4); \n adb._writePacket(commands.WRTE, shell._localId, shell._remoteId, sendBuffer); ```
-    //
-    //
-    // mean while tell the user what is going on via the frontend interface.
-    //
-    // Note this is possible thanks the the developer PC IP in dev mode was set to 127.0.0.1 which creates a local dev loop, so we ourselves can install stuff as if we were Tizen Studio on desktop (that is simulated / hack).
+// State management
+// architecture note: HTTP (single command) + SSE (status)
+var server = null;
+var client_response = null; // could be array, but we only have one client.
+var devModeFailed = false;
 
+var Events = {
+    
 
+    Error: 3,
+    InstallationStatus: 4,
+    
+    ConnectToTV: 6,
+    ExtraInfo: 7
+};
 
-    const { writeFileSync, readFileSync, readdirSync, statSync, mkdirSync, existsSync } = require('fs');
-    const { join, dirname } = require('path');
-    const { homedir } = require('os');
+// General note: some code is bulky or longer than needed because of backwards compatibility.
 
-    const { Signature, SamsungCertificateCreator } = require('tizen')
-    const adbhost = require('adbhost');
-    const AdbPacket = require('adbhost/lib/packet.js');
+// 1. GitHub API -> Find .wgt URL
+function findWgtAppURL(repoPath, callback) {
+    var options = { 
+        hostname: 'api.github.com',
+        path: '/repos/' + repoPath + '/releases/latest',
+        headers: HEADERS
+    };
 
-    const { execSync } = require('child_process'); // for wascmd, possibly also buxton2ctl if needed
-    const xml2js = require('xml2js');
-    const JSZip = require('jszip');
-
-
-    function checkCanConnectToDevice() {
-        fetch('http://127.0.0.1:8001/api/v2/').then(res => res.json())
-            .then(json => {
-                canConnectToDevice = (json.device.developerIP === '127.0.0.1' || json.device.developerIP === '1.0.0.127') && json.device.developerMode === '1';
-            }).catch(err => {
-                setTimeout(checkCanConnectToDevice, 1000);
-            });
-    }
-
-
-    const saveFileName = `${homedir()}/share/tizenbrewInstallerSave.json`;
-    function readConfig() {
-        if (!existsSync(saveFileName)) {
-            return {
-                authorCert: null,
-                distributorCert: null,
-                password: null
-            };
-        }
-        return JSON.parse(readFileSync(saveFileName, 'utf8'));
-    }
-
-    function writeConfig(config) {
-        if (!existsSync(`${homedir()}/share`)) {
-            mkdirSync(`${homedir()}/share`);
+    https.get(options, function (res) { 
+        if (res.statusCode !== STATUS_OK) {
+            callback(new Error('GitHub API returned (not ok): ' + res.statusCode));
+            return;
         }
 
-        writeFileSync(saveFileName, JSON.stringify(config, null, 4));
-    }
-
-
-    function htmlWebPageForCertificateCredentials() {
-        // TODO
-    }
-
-
-    function fetchLatestRelease(repo) {
-        // TODO
-    }
-
-    // and a lot more code to be made...
-
-} // end of onStart()
-
-// This is called when the UI sends an AppControl signal
-module.exports.onRequest = function (request) {
-    const wgtUrl = request.data.find(d => d.key === "wgt_url").value[0];
-    // TODO
+        var data = '';
+        res.on('data', function (chunk) { data += chunk; });
+        res.on('end', function () {
+            try {
+                var releases = JSON.parse(data);
+                if (releases.assets && releases.assets.length) {
+                    var asset = releases.assets.filter(function (a) { return /\.wgt$/i.test(a.name); })[0];
+                    if (asset) callback(null, asset.browser_download_url, asset.name); // success
+                    else callback(new Error('No .wgt found in repo releases: ' + JSON.stringify(options)));
+                }
+                else callback(new Error('No .wgt found in repo releases'));
+            } catch (e) { callback(new Error('GitHub API/JSON Error: ' + e.message)); }
+        });
+    }).on('error', function (e) { callback(new Error('Network error: ' + e.message)); });
 }
 
-module.exports.onStart();
+// 2. GitHub Downloader (Streaming to avoid OOM)
+function downloadWgtAppFromURL(url, callback) {
+    https.get(url, {headers: HEADERS}, function (res) {
+        // Handle GitHub/S3 Redirects, needed.
+        if (res.statusCode >= 300 && res.statusCode < 400) { // 301 and 302
+            return downloadWgtAppFromURL(res.headers.location, callback);
+        }
+        if (res.statusCode !== STATUS_OK) { 
+            return callback(new Error('Download failed: ' + res.statusCode));
+        }
+        // we do not block if server answers wrong, but might be worth debug for.
+        log("content type: " + (res.headers['content-type'] || '')); 
 
+        // Warning: Some Tizen 5.5 / 6.0 TVs run Node v10.9.0 , this is not supported.
+        //fs.mkdirSync(TEMP_WGT_FOLDER_PATH, { recursive: true }); 
+        child_process.execSync('mkdir -p ' + TEMP_WGT_FOLDER_PATH);
+        
+        var file = fs.createWriteStream(TEMP_WGT_PATH);
+        res.pipe(file); // store to file.
+
+        var done = false;
+        function finish(err) { // incase callback gets called twice.
+            if (done) return;
+            done = true;
+            callback(err);
+        }
+        
+        file.on('error', finish);
+        res.on('error', finish);
+        
+        file.on('finish', function () {
+            file.close(finish);
+        });
+    }).on('error', callback);
+}
+
+// 3. Installer Logic
+function installPackage(sendStatus, pkgPath) {
+    // Note: this project is a dev tool, no shell escape, no security, if dev wants to do injection feel free. 
+    // Determine Package ID from config.xml inside WGT
+    // instead of jsZip try linux unzip.
+    var cmd = 'unzip -p ' + pkgPath + ' config.xml' // | grep -o 'package=\"[^\"]*\"' | head -1 | cut -d'\"' -f2";
+
+    child_process.exec(cmd, function (err, stdout) {
+        if (err) return sendStatus(Events.Error, 'Unzip command failed: ' + err.message);
+
+        /* 
+        Install:    package ID        <tizen:application package="...">
+        Launch:     application ID    <tizen:application id="...">
+        Signing:    widget ID         <widget id="...">
+         */
+        var match = stdout.match(/<tizen:application[^>]*package="([^"]+)"/);
+        if (!match || !match[1]) return sendStatus(Events.Error, 'Could not find package info in config.xml');
+
+        var pkgId = match[1].trim();
+        if (!pkgId) return sendStatus(Events.Error, 'Could not find Package ID in config.xml');
+        // maybe test pkgID length == 10, unsure what modern Tizen docs say.
+
+        sendStatus(Events.InstallationStatus, 'Installing ' + pkgId + ' ... (' + pkgId.length + ')');
+
+        // Final command
+        // Note: Tizen 7+ would need a 'tizen sign' call here before wascmd
+        child_process.exec('wascmd -i ' + pkgId + ' -p ' + pkgPath, function (err, stdout, stderr) {
+            if (err) return sendStatus(Events.Error, 'Install failed: ' + err.message + (stderr ? '\n' + stderr : ''));
+            if (stderr) log('wascmd stderr: ' + stderr);
+
+            sendStatus(Events.InstallationStatus, 'Successfully installed!'); 
+            sendStatus(Events.ExtraInfo, stdout); 
+            try {
+                if (fs.existsSync(TEMP_WGT_PATH)) {
+                    fs.unlinkSync(TEMP_WGT_PATH);
+                }
+            }
+        });
+    });
+}
+
+// 0. Install Request Handling
+function handleInstallRequest(sendStatus, req) {
+    if (devModeFailed) {
+        sendStatus(Events.Error, 'Failed to setup dev mode: ' + devModeFailed.err)
+        return;
+    }
+
+    var data = '';
+    req.on('data', function (chunk) { data += chunk; });
+    req.on('end', function () {
+        var repo = data.trim();
+        if (!repo) return sendStatus(Events.Error, 'No repo provided.');
+        
+        // downloadAndInstallRepo();
+        sendStatus(Events.InstallationStatus, 'Fetching GitHub release...');
+        findWgtAppURL(repo, function (err, downloadURL, name) {
+            if (err) return sendStatus(Events.Error, err.message);
+
+            sendStatus(Events.InstallationStatus, 'Downloading ' + name + ' ...');
+            downloadWgtAppFromURL(downloadURL, function (err) {
+                if (err) return sendStatus(Events.Error, 'Download failed: ' + err.message);
+
+                sendStatus(Events.InstallationStatus, 'Downloaded the .wgt');
+                installPackage(sendStatus, TEMP_WGT_PATH);
+            });
+        });
+
+    });
+}
+
+
+function handleAuthRequest(req, res) {
+    // TODO  this is fake stub
+    var body = '';
+    req.on('data', function (chunk) { body += chunk; });
+    req.on('end', function () {
+        // Logic to save Samsung Account data to SAVE_PATH
+        fs.writeFileSync(SAVE_PATH, body);
+        res.writeHead(STATUS_OK, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ status: 'success' }));
+    });
+}
+
+// Minimal Web Server
+function createWebServer() {
+    server = http.createServer(function (req, res) {
+        // Handle Tizen 7+ Auth
+        if (req.url === '/handle-auth' && req.method === 'POST') {
+            handleAuthRequest(req, res); // maybe on a seperate port... TODO
+        }
+        else if (req.url === '/delete-saved-info' && req.method === 'POST') { 
+            try {
+                if (fs.existsSync(SAVE_PATH)) {
+                    fs.unlinkSync(SAVE_PATH);
+                }
+                res.writeHead(STATUS_OK);
+                res.end(JSON.stringify({ status: 'success' }));
+            } catch (e) {
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        }
+        else if (req.url === '/install' && req.method === 'POST') { // start installing
+            // could check if(client_reponse) is there, but I'll let it slide anyway.
+            handleInstallRequest(sendStatus, req);
+            res.writeHead(202); // "Accepted"
+            res.end(JSON.stringify({ status: 'processing' }));
+        }
+        else if (req.url === '/events' && req.method === 'GET') { // live connection to write current status to
+            res.writeHead(STATUS_OK, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            });
+
+            client_response = res;
+
+            var heartbeat = setInterval(function () { // avoid dropped connection
+                if (client_response) {
+                    client_response.write(':\n\n'); 
+                }
+            }, 15000);
+
+            req.on('close', function () {
+                clearInterval(heartbeat);
+                client_response = null;
+            });
+
+            sendStatus(Events.ConnectToTV, 'Service Online');
+        }
+        else { // no such page
+            res.writeHead(404);
+            res.end();
+        }
+    });
+
+    server.listen(SERVER_PORT, LOCAL_HOST); // Use 0.0.0.0 for LAN access??
+    log('TizenBrew Service Started on ' + SERVER_PORT);
+}
+
+// Initialize "The Hack"
+function initDevMode() {
+    try {
+        child_process.execSync('buxton2ctl set-string system db/sdk/develop/ip ' + LOCAL_HOST);
+        child_process.execSync('buxton2ctl set-int32 system db/sdk/develop/mode 1');
+        log('Dev mode initialized');  // TODO we don't check anything via :8001/api
+        devModeFailed = false;
+    } catch (e) {
+        console.error('Failed to set dev mode:', e.message);
+        devModeFailed = { err: e.message };
+    }
+}
+
+
+// Lifecycle Exports
+module.exports.onStart = function () {
+    initDevMode();
+    createWebServer();
+}
+
+module.exports.onRequest = function () {
+    // mostly for 'Keep Alive' insurance testing
+    log('TizenBrew Service request received');
+};
+
+module.exports.onStop = function () {
+    sendStatus(Events.Error, 'Service Offline!');
+    if (server) server.close();
+};
+
+
+
+// --- Utilities ---
+
+function sendStatus(type, message) {
+    if (!client_response) {
+        log('tried to send status, but no client connected');
+        return;
+    }
+    var payload = JSON.stringify({ type: type, message: message });
+    client_response.write('data: ' + payload + '\n\n');
+}
+
+function log(message) {
+    console.log('TizenBrew Service: ' + message)
+}
