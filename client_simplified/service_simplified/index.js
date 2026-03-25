@@ -2,6 +2,8 @@
 // docs: https://docs.tizen.org/application/web/get-started/web-service/first-service/
 // This Installer Service is used to download .wgt and run commands to sign and install the app, simplest way possible.
 
+'use strict';
+
 var http = require('http');
 var https = require('https');
 var fs = require('fs');
@@ -218,6 +220,7 @@ function createWebServer() {
             res.end(JSON.stringify({ status: 'processing' }));
         }
         else if (req.url === '/events' && req.method === 'GET') { // live connection to write current status to
+            // set up SSE
             res.writeHead(STATUS_OK, {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
@@ -284,12 +287,11 @@ module.exports.onStop = function () {
 // --- Utilities ---
 
 function sendStatus(type, message) {
-    if (!clientResponse) {
-        log('tried to send status, but no client connected');
-        return;
+    if (clientResponse) {
+        var payload = JSON.stringify({ type: type, message: message });
+        clientResponse.write('data: ' + payload + '\n\n');
     }
-    var payload = JSON.stringify({ type: type, message: message });
-    clientResponse.write('data: ' + payload + '\n\n');
+    else log('tried to send status, but no client connected');
 }
 
 function log(message) {
