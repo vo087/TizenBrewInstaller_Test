@@ -22,10 +22,11 @@
     <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
 
-    <tizen:service id="vo087TizenIn.TizenBrewInstallerServiceSimple">
+    <tizen:service id="vo087TizenIn.TizenBrewInstallerServiceSimple" auto-restart="false" on-boot="false">
         <tizen:content src="client_simplified/service_simplified/index.js"/>
         <tizen:name>TizenBrewServiceSimple</tizen:name>
         <tizen:description>TizenBrewServiceSimple</tizen:description>
+        <tizen:category name="http://tizen.org/category/service"/>
     </tizen:service>
 
     <tizen:setting pointing-device-support="enable" screen-orientation="landscape" context-menu="enable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>

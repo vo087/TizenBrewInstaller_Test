@@ -22,17 +22,18 @@ var STATUS_OK = 200
 // State management
 // architecture note: HTTP (single command) + SSE (status)
 var server = null;
-var client_response = null; // could be array, but we only have one client.
+var clientResponse = null; // could be array, but we only have one client.
 var devModeFailed = false;
 
 var Events = {
-    
+
 
     Error: 3,
     InstallationStatus: 4,
-    
+
     ConnectToTV: 6,
-    ExtraInfo: 7
+    ExtraInfo: 7,
+    NeedAuth: 8
 };
 
 // General note: some code is bulky or longer than needed because of backwards compatibility.
@@ -135,12 +136,16 @@ function installPackage(sendStatus, pkgPath) {
 
             sendStatus(Events.InstallationStatus, 'Successfully installed!'); 
             sendStatus(Events.ExtraInfo, stdout); 
+
             try {
                 if (fs.existsSync(TEMP_WGT_PATH)) {
                     fs.unlinkSync(TEMP_WGT_PATH);
                 }
+            } catch (e) {
+                log('clean up failed');
             }
         });
+        // TODO if cert sign failed, maybe wipe saved data.
     });
 }
 
@@ -219,17 +224,17 @@ function createWebServer() {
                 'Connection': 'keep-alive'
             });
 
-            client_response = res;
+            clientResponse = res;
 
             var heartbeat = setInterval(function () { // avoid dropped connection
-                if (client_response) {
-                    client_response.write(':\n\n'); 
+                if (clientResponse) {
+                    clientResponse.write(':\n\n'); 
                 }
             }, 15000);
 
             req.on('close', function () {
                 clearInterval(heartbeat);
-                client_response = null;
+                clientResponse = null;
             });
 
             sendStatus(Events.ConnectToTV, 'Service Online');
@@ -279,12 +284,12 @@ module.exports.onStop = function () {
 // --- Utilities ---
 
 function sendStatus(type, message) {
-    if (!client_response) {
+    if (!clientResponse) {
         log('tried to send status, but no client connected');
         return;
     }
     var payload = JSON.stringify({ type: type, message: message });
-    client_response.write('data: ' + payload + '\n\n');
+    clientResponse.write('data: ' + payload + '\n\n');
 }
 
 function log(message) {

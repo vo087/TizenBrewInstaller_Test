@@ -196,7 +196,7 @@ var App = (function () {
   /*  Install helper  */
   function installRepo(repo) {
     showStatus('Preparing to install ' + repo + '...');
-    WS.send(WS.Events.InstallPackage, { url: repo });
+    server.get("/install", repo); // this is not correct and not how you do it over http
   }
 
   function addInfo(newInfo) {
@@ -228,7 +228,7 @@ var App = (function () {
 
   function showSigningOverlay() {
     var ip = '';
-    try { ip = webapis.network.getIp(); } catch (e) { ip = 'localhost'; }
+    try { ip = webapis.network.getIp(); } catch (e) { ip = 'localhost'; } // does this even work
     accessUrlEl.textContent = 'http://' + ip + ':4794';
     overlaySign.classList.remove('hidden');
   }
@@ -242,11 +242,12 @@ var App = (function () {
   // tbLabel.textContent = 'Update TizenBrew';
 
   /*  Boot  */
-  WS.connect(function () {
+  function init() { // not how you do it.
     applyFocus();
-  });
+  };
+  init();
 
-  /*  Public API (called by ws.js)  */
+  /*  Public API (called by bridge.js)  */
   return {
     showStatus:         showStatus,
     hideStatus:         hideStatus,
@@ -261,8 +262,8 @@ var App = (function () {
 
 
 
-// Here is a trick instead of using a websocket inside Tizen:
-// This might not work, untested.
+// Here is a trick instead of using a web interface inside Tizen:
+// This might not work, untested. Is this only for Node services, because this file is a web app.
 function triggerServiceInstall(wgtUrl, samsungInfo) {
   const serviceId = "vo087TizenIn.InstallerService"; // From your config.xml
 

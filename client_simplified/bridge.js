@@ -1,108 +1,90 @@
-/* WebSocket client wrapper
-   target: Tizen 5.5+ / Chromium 69
-   Handles connection to the TizenBrew installer service (ws://localhost:8091)
-   and re-dispatches events to the app via window callbacks.
+/*  Bridge to localhost:8091 which is the service in service_simplified/index.js
+    target: Tizen 5.5+ / Chromium 69
+    Handles connection to the TizenBrew installer service (localhost:8091)  (http client to server)
+    and shows new information about the process via SSE (server to client)
 */
 
 'use strict';
 
-var WS = (function () {
 
-  var Events = {
-    InstallPackage:      1,
-    
-    Error:               3,
-    InstallationStatus:  4,
-    DeleteConfiguration: 5,
-    ConnectToTV:         6
+var Events = {
+  
+  
+  Error:              3,
+  InstallationStatus: 4,
+  
+  ConnectToTV:        6,
+  ExtraInfo:          7,
+  NeedAuth:           8
+};
+
+var server = null;
+
+  
+
+function connect(onReady) { // TODO
+  server = // something something connect to localhost:8091
+
+  // if localhost:8091/events not working
+  onError = function () {
+    // Service not yet running, launch it, then reload - I don't know if this is correct.
+    // Is this even possible on the Web App side wgt, isn't this only for node service code?
+    var pkgId = tizen.application.getCurrentApplication().appInfo.packageId;
+    tizen.application.launchAppControl(
+      new tizen.ApplicationControl('http://tizen.org/appcontrol/operation/service'),
+      pkgId + '.InstallerService',
+      function () { window.location.reload(); },
+      function (e) { App.showError('Could not start install service: ' + e.message); }
+    );
   };
 
-  var socket = null;
-
-  var statusLabels = {
-    'installStatus.fetching':   'Fetching from GitHub...',
-    'installStatus.resigning':  'Signing package...',
-    'installStatus.parsing':    'Reading package...',
-    'installStatus.installing': 'Installing...',
-    'installStatus.installed':  'Installed successfully!'
+  // new SSE event 
+  onEvent = function (event) {
+    var msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+    handleMessage(msg.type, msg.payload);
   };
+}
 
-  function connect(onReady) {
-    socket = new WebSocket('ws://localhost:8091');
+function handleMessage(type, payload) {
+  switch (type) {
 
-    socket.onopen = function () {
-      if (typeof onReady === 'function') onReady();
-    };
-
-    socket.onerror = function () {
-      // Service not yet running, launch it, then reload
-      var pkgId = tizen.application.getCurrentApplication().appInfo.packageId;
-      tizen.application.launchAppControl(
-        new tizen.ApplicationControl('http://tizen.org/appcontrol/operation/service'),
-        pkgId + '.InstallerService',
-        function () { window.location.reload(); },
-        function (e) { App.showError('Could not start install service: ' + e.message); }
-      );
-    };
-
-    socket.onmessage = function (event) {
-      var msg;
-      try { msg = JSON.parse(event.data); } catch (e) { return; }
-      handleMessage(msg.type, msg.payload);
-    };
-  }
-
-  function handleMessage(type, payload) {
-    switch (type) {
-
-      case Events.InstallPackage:
-        // response 0 = done, 1 = cert saved, 2 = cert needed
-        if (payload.response === 2) {
-          App.showSigningOverlay();
-        } else if (payload.response === 1) {
-          App.hideSigningOverlay();
-          App.showStatus('Certificate saved, retrying...');
-        } else if (payload.response === 0) {
-          App.hideStatus();
-          var failLine = payload.result && payload.result.split('\n').filter(function (l) {
-            return l.indexOf('install failed') !== -1;
-          })[0];
-          if (failLine) {
-            App.showError('Install failed: ' + failLine);
-            // If cert error, wipe stored cert so user re-signs next time
-            if (failLine.indexOf('Check certificate error') !== -1) {
-              send(Events.DeleteConfiguration, null);
-            }
-          } else {
-            App.showStatus('✓ Installed successfully!');
-            setTimeout(function () { App.hideStatus(); }, 4000);
-          }
-        }
-        break;
-
-      case Events.InstallationStatus:
-        App.showStatus(statusLabels[payload] || payload);
-        break;
-
-      case Events.Error:
+    case Events.NeedAuth:
+      // This is worng, but example code.
+      // response 0 = done, 1 = cert saved, 2 = cert needed
+      if (payload.response === 2) {
+        App.showSigningOverlay();
+      } else if (payload.response === 1) {
+        App.hideSigningOverlay();
+        App.showStatus('Certificate saved, retrying...');
+      } else if (payload.response === 0) {
         App.hideStatus();
-        App.showError(payload);
-        break;
-    }
+        var failLine = payload.result && payload.result.split('\n').filter(function (l) {
+          return l.indexOf('install failed') !== -1;
+        })[0];
+        if (failLine) {
+          App.showError('Install failed: ' + failLine);
+        } else {
+          App.showStatus('✓ Installed successfully!');
+          setTimeout(function () { App.hideStatus(); }, 4000);
+        }
+      }
+      break;
+
+    case Events.ConnectToTV:
+      App.showStatus(payload);
+      break;
+
+    case Events.InstallationStatus:
+      App.showStatus(payload);
+      App.addInfo(payload);
+      break;
+
+    case Events.Error:
+      App.hideStatus();
+      App.showError(payload);
+      App.addInfo(payload);
+      break;
   }
+}
 
-  function send(type, payload) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      App.showError('Not connected to install service.');
-      return;
-    }
-    socket.send(JSON.stringify({ type: type, payload: payload }));
-  }
-
-  return {
-    Events:  Events,
-    connect: connect,
-    send:    send
-  };
-
-})();
