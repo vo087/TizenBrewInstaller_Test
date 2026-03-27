@@ -20,15 +20,14 @@ var Events = {
 
 var server = null;
 
-  
+// TODO WIP not a working bridge
 
 function connect(onReady) { // TODO
   server = // something something connect to localhost:8091
 
   // if localhost:8091/events not working
   onError = function () {
-    // Service not yet running, launch it, then reload - I don't know if this is correct.
-    // Is this even possible on the Web App side wgt, isn't this only for node service code?
+    // is this needed?
     var pkgId = tizen.application.getCurrentApplication().appInfo.packageId;
     tizen.application.launchAppControl(
       new tizen.ApplicationControl('http://tizen.org/appcontrol/operation/service'),

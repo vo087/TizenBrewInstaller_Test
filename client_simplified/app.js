@@ -196,7 +196,7 @@ var App = (function () {
   /*  Install helper  */
   function installRepo(repo) {
     showStatus('Preparing to install ' + repo + '...');
-    server.get("/install", repo); // this is not correct and not how you do it over http
+    server.get("/install", repo); // TODO WIP this is not correct and not how you do it over http
   }
 
   function addInfo(newInfo) {
@@ -228,7 +228,7 @@ var App = (function () {
 
   function showSigningOverlay() {
     var ip = '';
-    try { ip = webapis.network.getIp(); } catch (e) { ip = 'localhost'; } // does this even work
+    try { ip = webapis.network.getIp(); } catch (e) { ip = 'localhost'; } 
     accessUrlEl.textContent = 'http://' + ip + ':4794';
     overlaySign.classList.remove('hidden');
   }
@@ -261,6 +261,7 @@ var App = (function () {
 })();
 
 
+/* --- OTHER IRRELEVANT SCRAP BOOK --- */
 
 // Here is a trick instead of using a web interface inside Tizen:
 // This might not work, untested. Is this only for Node services, because this file is a web app.
@@ -288,5 +289,5 @@ function triggerServiceInstall(wgtUrl, samsungInfo) {
 }
 
 // Also here is something else
-// maybe this privledge could be used instead of adb + wascmd or similar :
+// maybe this privledge could be used instead of  wascmd or similar :
 // http://tizen.org/privilege/packagemanager.install

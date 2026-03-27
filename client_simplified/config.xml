@@ -16,13 +16,24 @@
     <tizen:profile name="tv-samsung"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <feature name="http://tizen.org/feature/web.service"/>
+
+    <!-- Core networking (http/https outbound, SmartView API on :8001, Samsung SCS API) -->
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
+
+    <!-- File system: read/write for temp wgt, cert save file -->
+    <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
+    <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
+
+    <!-- Samsung SSO + Samsung Certificate Service (SCS) , required for Tizen 7+ cert creation -->
+    <tizen:privilege name="http://developer.samsung.com/privilege/sso.account"/>
+
+    <!-- Samsung product info: used by SamsungCertificateCreator to identify the device -->
+    <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+
+    <!-- TV input device and app launch (UI needs these) -->
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
-    <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
-    <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
-    <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
-    <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
 
     <tizen:service id="vo087TizenIn.TizenBrewInstallerServiceSimple" auto-restart="false" on-boot="false">
         <tizen:content src="client_simplified/service_simplified/index.js"/>
@@ -31,6 +42,8 @@
         <tizen:category name="http://tizen.org/category/service"/>
     </tizen:service>
 
-    <tizen:setting pointing-device-support="enable" screen-orientation="landscape" context-menu="enable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+    <tizen:setting pointing-device-support="enable" screen-orientation="landscape"
+                   context-menu="enable" background-support="enable"
+                   encryption="disable" install-location="auto" hwkey-event="enable"/>
 
 </widget>
